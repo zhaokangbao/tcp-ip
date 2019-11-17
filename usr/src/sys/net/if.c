@@ -67,14 +67,26 @@ void	if_slowtimo __P((void *arg));
  * Routines with ifa_ifwith* names take sockaddr *'s as
  * parameters.
  */
+//各个接口的结构初始化完毕之后，main函数调用该函数
 void
 ifinit()
 {
 	register struct ifnet *ifp;
 
+	/**
+	 * 输出队列的大小关键要考虑的是发送最大长度数据报的分组的个数
+	 * 例如以太网，一个进程调用sendto发送65507字节的数据，分片为45个数据报片
+	 * 然后每个数据报片放进接口的输出队列。
+	 * 如哦队列非常小，队列没有空间，进程可能无法发送大的数据报
+	 */
+	//遍历所有的接口，把没有在attach函数设置的每个接口的输出队列
+	//的最大长度设置为50(ifqmaxlen)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
 		if (ifp->if_snd.ifq_maxlen == 0)
 			ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	
+	//启动接口的监视计时器，内核会在接口时钟到期时，调用接口的看门狗函数
+	//重新设置时钟，或者设置if_timer为0可以组织看门狗函数的调用
 	if_slowtimo(0);
 }
 
@@ -448,6 +460,7 @@ if_qflush(ifq)
  * from softclock, we decrement timers (if set) and
  * call the appropriate interface routine on expiration.
  */
+//arg这个参数没有使用，在慢超时函数的原型(7.4节)要求这个参数
 void
 if_slowtimo(arg)
 	void *arg;
@@ -456,12 +469,18 @@ if_slowtimo(arg)
 	int s = splimp();
 
 	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
+		//if_timer为零或者减一后不为零，则跳过
 		if (ifp->if_timer == 0 || --ifp->if_timer)
 			continue;
 		if (ifp->if_watchdog)
 			(*ifp->if_watchdog)(ifp->if_unit);
 	}
 	splx(s);
+
+	//设置定时频率
+	//hz是一秒内时钟的跳数(通常为100)，这个意思是一秒钟，系统时钟跳动100下
+	//可以看出这个定时时间为1秒
+	//该函数设置的回调函数，被内核函数callout调用，目前不做进一步解释
 	timeout(if_slowtimo, (void *)0, hz / IFNET_SLOWHZ);
 }
 

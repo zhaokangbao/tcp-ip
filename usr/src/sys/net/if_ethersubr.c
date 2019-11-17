@@ -482,6 +482,7 @@ ether_sprintf(ap)
 /*
  * Perform common duties while attaching to interface list
  */
+//执行对所有以太网设备通用的ifnet结构的初始化
 void
 ether_ifattach(ifp)
 	register struct ifnet *ifp;
@@ -489,10 +490,16 @@ ether_ifattach(ifp)
 	register struct ifaddr *ifa;
 	register struct sockaddr_dl *sdl;
 
+	//设置接口类型
 	ifp->if_type = IFT_ETHER;
+	//硬件地址长度为6个字节
 	ifp->if_addrlen = 6;
+	//整个以太网首部为14个字节
 	ifp->if_hdrlen = 14;
+	//以太接口的MTU为1500
 	ifp->if_mtu = ETHERMTU;
+	//循环定位接口的链路地址，初始化结构sockaddr_dl中的以太网硬件地址信息
+	//是从arpcom的中的ac_enaddr中找到的链路地址
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 		if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
 		    sdl->sdl_family == AF_LINK) {
